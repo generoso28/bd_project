@@ -1,9 +1,9 @@
 package br.inatel.Biblioteca;
 
 public class Exemplar_livro {
-    private int id;
-    private Livro livro;
-    private boolean status;
+    private final int id;
+    private final Livro livro;
+    private final boolean status;
 
     public Exemplar_livro(int id, Livro livro, boolean status) {
         this.id = id;

@@ -16,7 +16,7 @@ public class CategoriaDao implements Dao<Categoria, Integer> {
 
     @Override
     public boolean create(Categoria categoria) throws SQLException {
-        String sql = "INSERT INTO categoria (nome) VALUES (?)";
+        String sql = "INSERT INTO categoria (nomeCategoria) VALUES (?)";
         try (PreparedStatement stmt = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
             stmt.setString(1, categoria.getNome());
             stmt.executeUpdate();
@@ -28,7 +28,7 @@ public class CategoriaDao implements Dao<Categoria, Integer> {
 
     @Override
     public Categoria read(Integer id) throws SQLException {
-        String sql = "SELECT * FROM categoria WHERE id = ?";
+        String sql = "SELECT * FROM categoria WHERE idCategoria = ?";
         try (PreparedStatement stmt = conn.prepareStatement(sql)) {
             stmt.setInt(1, id);
             ResultSet rs = stmt.executeQuery();

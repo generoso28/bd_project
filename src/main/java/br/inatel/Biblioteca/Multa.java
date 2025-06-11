@@ -1,10 +1,10 @@
 package br.inatel.Biblioteca;
 
 public class Multa {
-    private int id;
-    private double multa;
-    private double juros;
-    private Emprestimo emprestimo;
+    private final int id;
+    private final double multa;
+    private final double juros;
+    private final Emprestimo emprestimo;
 
     public Multa(Emprestimo emprestimo, double juros, double multa, int id) {
         this.emprestimo = emprestimo;

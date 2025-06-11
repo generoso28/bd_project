@@ -7,11 +7,11 @@ import java.util.*;
 import java.time.Year;
 
 public class Livro{
-    private String isbn;
-    private String titulo;
-    private Year anoPublicacao;
-    private Categoria categoria;
-    private List<Autor> autores;
+    private final String isbn;
+    private final String titulo;
+    private final Year anoPublicacao;
+    private final Categoria categoria;
+    private final List<Autor> autores;
 
     public Livro(String isbn, Categoria categoria, String titulo, Year anoPublicacao, List<Autor> autores) {
         this.isbn = isbn;

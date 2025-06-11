@@ -3,11 +3,11 @@ package br.inatel.Biblioteca;
 import java.time.LocalDate;
 
 public class Emprestimo {
-    private int id;
-    private LocalDate dataEmprestimo;
-    private LocalDate dataDevolucao;
-    private Usuario usuario;
-    private Exemplar_livro livro;
+    private final int id;
+    private final LocalDate dataEmprestimo;
+    private final LocalDate dataDevolucao;
+    private final Usuario usuario;
+    private final Exemplar_livro livro;
 
     public Emprestimo(int id, LocalDate dataEmprestimo, LocalDate dataDevolucao, Usuario usuario, Exemplar_livro livro) {
         this.id = id;

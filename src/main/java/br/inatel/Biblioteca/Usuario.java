@@ -1,11 +1,11 @@
 package br.inatel.Biblioteca;
 
 public class Usuario {
-    private int id;
-    private String nome;
-    private String email;
-    private String telefone;
-    private String tipo;
+    private final int id;
+    private final String nome;
+    private final String email;
+    private final String telefone;
+    private final String tipo;
 
     public Usuario(int id, String nome, String email, String telefone, String tipo) {
         this.id = id;
