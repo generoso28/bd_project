@@ -1,12 +1,39 @@
 package br.inatel.Biblioteca;
 
-import java.util.Date;
+import java.time.LocalDate;
 
 public class Emprestimo {
     private int id;
-    private Date dataEmprestimo;
-    private Date dataDevolucao;
+    private LocalDate dataEmprestimo;
+    private LocalDate dataDevolucao;
     private Usuario usuario;
     private Exemplar_livro livro;
 
+    public Emprestimo(int id, LocalDate dataEmprestimo, LocalDate dataDevolucao, Usuario usuario, Exemplar_livro livro) {
+        this.id = id;
+        this.dataEmprestimo = dataEmprestimo;
+        this.dataDevolucao = dataDevolucao;
+        this.usuario = usuario;
+        this.livro = livro;
+    }
+
+    public int getId() {
+        return id;
+    }
+
+    public LocalDate getDataEmprestimo() {
+        return dataEmprestimo;
+    }
+
+    public LocalDate getDataDevolucao() {
+        return dataDevolucao;
+    }
+
+    public Usuario getUsuario() {
+        return usuario;
+    }
+
+    public Exemplar_livro getLivro() {
+        return livro;
+    }
 }
