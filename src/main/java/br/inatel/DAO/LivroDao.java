@@ -57,19 +57,21 @@ public class LivroDao extends AbstractComplexDao<Livro, String> implements Dao<L
     @Override
     protected Livro mapRowToMainEntity(ResultSet rs) throws SQLException {
         Categoria categoria = new Categoria(rs.getInt("idCategoria"), rs.getString("nomeCategoria"));
-        return new Livro(
+        Livro livro = new Livro(
                 rs.getString("isbn"),
                 categoria,
                 rs.getString("titulo"),
-                Year.of(rs.getInt("anoPublicacao")),
+                rs.getInt("anoPublicacao"),
                 new ArrayList<>() // A lista de autores começa vazia
         );
+        livro.setQuantidadeExemplares(rs.getInt("quantidadeExemplares"));
+        return livro;
     }
 
     @Override
     protected void addNestedEntity(Livro livro, ResultSet rs) throws SQLException {
         // Adiciona o autor (a entidade aninhada) se ele existir na linha atual.
-        int autorId = rs.getInt("idAutor");
+        int autorId = rs.getInt("id");
         if (autorId != 0) {
             // Garante que o mesmo autor não seja adicionado múltiplas vezes ao mesmo livro.
             boolean autorJaAdicionado = livro.getAutores().stream().anyMatch(a -> a.getId() == autorId);
@@ -85,11 +87,12 @@ public class LivroDao extends AbstractComplexDao<Livro, String> implements Dao<L
         SELECT
             l.isbn, l.titulo, l.anoPublicacao,
             c.idCategoria, c.nomeCategoria,
-            a.idAutor, a.nome, a.paisOrigem
+            a.id, a.nome, a.paisOrigem,
+            (SELECT COUNT(*) FROM exemplar_livro ex WHERE ex.isbn_livro = l.isbn) AS quantidadeExemplares
         FROM livro l
         JOIN categoria c ON l.categoria_idCategoria = c.idCategoria
         LEFT JOIN livro_has_autor lha ON l.isbn = lha.livro_ISBN
-        LEFT JOIN autor a ON lha.autor_idAutor = a.idAutor
+        LEFT JOIN autor a ON lha.autor_idAutor = a.id
         """;
     }
 
@@ -105,7 +108,7 @@ public class LivroDao extends AbstractComplexDao<Livro, String> implements Dao<L
 
             stmtLivro.setString(1, livro.getIsbn());
             stmtLivro.setString(2, livro.getTitulo());
-            stmtLivro.setInt(3, livro.getAnoPublicacao().getValue());
+            stmtLivro.setInt(3, livro.getAnoPublicacao());
             stmtLivro.setInt(4, livro.getCategoria().getId());
             int affectedRows = stmtLivro.executeUpdate();
 
@@ -133,25 +136,43 @@ public class LivroDao extends AbstractComplexDao<Livro, String> implements Dao<L
 
     @Override
     public boolean delete(String isbn) throws SQLException {
-        conn.setAutoCommit(false);
+        conn.setAutoCommit(false); // Inicia a transação
+
+        // 1. SQL para deletar os exemplares (NOVO)
+        String sqlDeleteExemplares = "DELETE FROM exemplar_livro WHERE isbn_livro = ?";
+        // 2. SQL para deletar as associações com autores
         String sqlDeleteAutores = "DELETE FROM livro_has_autor WHERE livro_ISBN = ?";
+        // 3. SQL para deletar o livro principal
         String sqlDeleteLivro = "DELETE FROM livro WHERE isbn = ?";
 
-        try (PreparedStatement stmtAutores = conn.prepareStatement(sqlDeleteAutores);
+        // Usamos um bloco try-with-resources para garantir que todos os Statements sejam fechados
+        try (PreparedStatement stmtExemplares = conn.prepareStatement(sqlDeleteExemplares); // NOVO
+             PreparedStatement stmtAutores = conn.prepareStatement(sqlDeleteAutores);
              PreparedStatement stmtLivro = conn.prepareStatement(sqlDeleteLivro)) {
+
+            // --- Ordem de execução é importante por causa das chaves estrangeiras ---
+
+            // Passo 1: Deleta os exemplares associados ao livro
+            stmtExemplares.setString(1, isbn);
+            stmtExemplares.executeUpdate();
+
+            // Passo 2: Deleta as associações na tabela livro_has_autor
             stmtAutores.setString(1, isbn);
             stmtAutores.executeUpdate();
 
+            // Passo 3: Finalmente, deleta o livro
             stmtLivro.setString(1, isbn);
-            int affectedRows = stmtLivro.executeUpdate();
+            int affectedRows = stmtLivro.executeUpdate(); // O resultado final depende desta operação
 
-            conn.commit();
+            conn.commit(); // Se tudo deu certo, confirma a transação
             return affectedRows > 0;
+
         } catch (SQLException e) {
-            conn.rollback();
-            throw e;
+            conn.rollback(); // Se qualquer passo falhar, desfaz todas as operações
+            System.err.println("Erro ao deletar livro. A transação foi revertida.");
+            throw e; // Lança a exceção para a camada superior (o Menu) tratar
         } finally {
-            conn.setAutoCommit(true);
+            conn.setAutoCommit(true); // Restaura o modo padrão de auto-commit
         }
     }
 }

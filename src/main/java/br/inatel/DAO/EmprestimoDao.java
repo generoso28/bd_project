@@ -4,6 +4,7 @@ import br.inatel.Biblioteca.*;
 import br.inatel.Interfaces.Dao;
 
 import java.sql.*;
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -22,7 +23,7 @@ public class EmprestimoDao extends AbstractComplexDao<Emprestimo, Integer> imple
     // O metodo readAll agora é muito mais simples!
     @Override
     public List<Emprestimo> readAll() throws SQLException {
-        String sql = getCompletaQuery() + " ORDER BY em.data_emprestimo DESC";
+        String sql = getCompletaQuery() + " ORDER BY em.dataEmprestimo DESC";
         try (Statement stmt = conn.createStatement();
              ResultSet rs = stmt.executeQuery(sql)) {
             // Chama o metodo da classe pai para fazer o trabalho pesado.
@@ -33,7 +34,7 @@ public class EmprestimoDao extends AbstractComplexDao<Emprestimo, Integer> imple
     // O metodo read também é simplificado.
     @Override
     public Emprestimo read(Integer id) throws SQLException {
-        String sql = getCompletaQuery() + " WHERE em.id_emprestimo = ?";
+        String sql = getCompletaQuery() + " WHERE em.idEmprestimo = ?";
         try (PreparedStatement stmt = conn.prepareStatement(sql)) {
             stmt.setInt(1, id);
             try (ResultSet rs = stmt.executeQuery()) {
@@ -70,7 +71,7 @@ public class EmprestimoDao extends AbstractComplexDao<Emprestimo, Integer> imple
         );
 
         // 4. Finalmente, cria o Emprestimo
-        Date dataDevolucaoSQL = rs.getDate("data_devolucao");
+        Date dataDevolucaoSQL = rs.getDate("dataDevolucao");
         return new Emprestimo(
                 rs.getInt("idEmprestimo"),
                 rs.getDate("dataEmprestimo").toLocalDate(),
@@ -97,24 +98,131 @@ public class EmprestimoDao extends AbstractComplexDao<Emprestimo, Integer> imple
         """;
     }
 
-    // Os métodos de escrita (create, update, delete) não mudam.
     @Override
     public boolean create(Emprestimo emprestimo) throws SQLException {
-        String sql = "INSERT INTO emprestimo (dataEmprestimo, usuario_idUsuario, livro_id) VALUES (?, ?, ?)";
-        try (PreparedStatement stmt = conn.prepareStatement(sql)) {
-            stmt.setDate(1, Date.valueOf(emprestimo.getDataEmprestimo()));
-            stmt.setInt(2, emprestimo.getUsuario().getId());
-            stmt.setInt(3, emprestimo.getLivro().getId());
-            return stmt.executeUpdate() > 0;
+        // SQL para verificar o status atual do exemplar.
+        String sqlCheckStatus = "SELECT status FROM exemplar_livro WHERE id_livro = ?";
+
+        String sqlInsertEmprestimo = "INSERT INTO emprestimo (dataEmprestimo, usuario_idUsuario, livro_id) VALUES (?, ?, ?)";
+        String sqlUpdateExemplar = "UPDATE exemplar_livro SET status = ? WHERE id_livro = ?";
+
+        conn.setAutoCommit(false); // Inicia a transação
+
+        try (PreparedStatement stmtCheck = conn.prepareStatement(sqlCheckStatus)) {
+            // Passo 1: Verificar o status do exemplar
+            int exemplarId = emprestimo.getLivro().getId();
+            stmtCheck.setInt(1, exemplarId);
+
+            try (ResultSet rs = stmtCheck.executeQuery()) {
+                // Se não encontrou o exemplar ou se ele já está emprestado, aborte.
+                if (!rs.next() || rs.getBoolean("status") == true) {
+                    conn.rollback(); // Desfaz a transação (embora nada tenha sido feito ainda)
+                    System.err.println("Operação abortada: O exemplar não existe ou já está emprestado.");
+                    return false; // Retorna false para indicar falha
+                }
+            }
+
+            // Se o código chegou até aqui, o exemplar está disponível. Prossiga.
+
+            // Passo 2: Inserir o novo registro na tabela de empréstimos
+            try (PreparedStatement stmtInsert = conn.prepareStatement(sqlInsertEmprestimo)) {
+                stmtInsert.setDate(1, java.sql.Date.valueOf(emprestimo.getDataEmprestimo()));
+                stmtInsert.setInt(2, emprestimo.getUsuario().getId());
+                stmtInsert.setInt(3, exemplarId);
+                stmtInsert.executeUpdate();
+            }
+
+            // Passo 3: Atualizar o status do exemplar para emprestado (true)
+            try (PreparedStatement stmtUpdate = conn.prepareStatement(sqlUpdateExemplar)) {
+                stmtUpdate.setBoolean(1, true);
+                stmtUpdate.setInt(2, exemplarId);
+                stmtUpdate.executeUpdate();
+            }
+
+            conn.commit(); // Confirma a transação
+            return true;
+
+        } catch (SQLException e) {
+            conn.rollback();
+            System.err.println("Erro ao criar empréstimo. A transação foi revertida.");
+            throw e;
+        } finally {
+            conn.setAutoCommit(true);
         }
     }
 
+    // Em: src/main/java/br/inatel/DAO/EmprestimoDao.java
+
     @Override
-    public boolean delete(Integer id) throws SQLException {
-        String sql = "DELETE FROM emprestimo WHERE idEmprestimo = ?";
-        try (PreparedStatement stmt = conn.prepareStatement(sql)) {
-            stmt.setInt(1, id);
-            return stmt.executeUpdate() > 0;
+    public boolean delete(Integer idEmprestimo) throws SQLException {
+        // Declaração dos SQLs que serão usados na transação
+        String sqlSelectEmprestimo = "SELECT livro_id FROM emprestimo WHERE idEmprestimo = ?";
+        String sqlDeleteEmprestimo = "DELETE FROM emprestimo WHERE idEmprestimo = ?";
+        String sqlUpdateExemplar = "UPDATE exemplar_livro SET status = ? WHERE id_livro = ?";
+
+        // Inicia a transação
+        conn.setAutoCommit(false);
+        int exemplarId = -1; // Variável para guardar o ID do exemplar
+
+        try {
+            // Passo 1: Descobrir qual exemplar está associado a este empréstimo
+            try (PreparedStatement stmtSelect = conn.prepareStatement(sqlSelectEmprestimo)) {
+                stmtSelect.setInt(1, idEmprestimo);
+                try (ResultSet rs = stmtSelect.executeQuery()) {
+                    if (rs.next()) {
+                        exemplarId = rs.getInt("livro_id");
+                    } else {
+                        // Se não existe empréstimo com esse ID, não há nada a fazer.
+                        conn.rollback();
+                        return false;
+                    }
+                }
+            }
+
+            // Passo 2: Deletar o registro do empréstimo
+            try (PreparedStatement stmtDelete = conn.prepareStatement(sqlDeleteEmprestimo)) {
+                stmtDelete.setInt(1, idEmprestimo);
+                int affectedRows = stmtDelete.executeUpdate();
+                if (affectedRows == 0) {
+                    // Se o delete falhou por algum motivo, reverte.
+                    conn.rollback();
+                    return false;
+                }
+            }
+
+            // Passo 3: Atualizar o status do exemplar para disponível (false)
+            try (PreparedStatement stmtUpdate = conn.prepareStatement(sqlUpdateExemplar)) {
+                stmtUpdate.setBoolean(1, false); // false = disponível
+                stmtUpdate.setInt(2, exemplarId);
+                stmtUpdate.executeUpdate();
+            }
+
+            // Se todos os passos foram concluídos com sucesso, confirma a transação
+            conn.commit();
+            return true;
+
+        } catch (SQLException e) {
+            // Em caso de qualquer erro, desfaz a transação inteira
+            conn.rollback();
+            System.err.println("Erro ao deletar empréstimo. A transação foi revertida.");
+            throw e;
+        } finally {
+            // Restaura o modo de auto-commit da conexão
+            conn.setAutoCommit(true);
         }
+    }
+    public boolean update(int idEmprestimo, LocalDate dataDevolucao) throws SQLException {
+        String sqlUpdateEmprestimo = "UPDATE emprestimo SET dataDevolucao = ? WHERE idEmprestimo = ?";
+        try (PreparedStatement stmtUpdate = conn.prepareStatement(sqlUpdateEmprestimo)) {
+            stmtUpdate.setDate(1, java.sql.Date.valueOf(dataDevolucao));
+            stmtUpdate.setInt(2, idEmprestimo);
+            int affectedRows = stmtUpdate.executeUpdate();
+            if (affectedRows == 0) {
+                conn.rollback();
+                return false;
+            }
+            conn.commit();
+        }
+        return true;
     }
 }

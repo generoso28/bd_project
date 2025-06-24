@@ -23,7 +23,7 @@ public class ExemplarDao extends AbstractComplexDao<Exemplar_livro, Integer> imp
     // readAll agora é simples e consistente.
     @Override
     public List<Exemplar_livro> readAll() throws SQLException {
-        String sql = getCompletaQuery() + " ORDER BY e.id_exemplar, a.nome";
+        String sql = getCompletaQuery() + " ORDER BY e.id_livro, a.nome";
         try (Statement stmt = conn.createStatement();
              ResultSet rs = stmt.executeQuery(sql)) {
             return processResultSet(rs);
@@ -33,7 +33,7 @@ public class ExemplarDao extends AbstractComplexDao<Exemplar_livro, Integer> imp
     // read também é simplificado.
     @Override
     public Exemplar_livro read(Integer id) throws SQLException {
-        String sql = getCompletaQuery() + " WHERE e.id_exemplar = ?";
+        String sql = getCompletaQuery() + " WHERE e.id_livro = ?";
         try (PreparedStatement stmt = conn.prepareStatement(sql)) {
             stmt.setInt(1, id);
             try (ResultSet rs = stmt.executeQuery()) {
@@ -61,7 +61,7 @@ public class ExemplarDao extends AbstractComplexDao<Exemplar_livro, Integer> imp
                 rs.getString("isbn"),
                 categoria,
                 rs.getString("titulo"),
-                Year.of(rs.getInt("anoPublicacao")),
+                rs.getInt("anoPublicacao"),
                 new ArrayList<>()
         );
 
@@ -76,7 +76,7 @@ public class ExemplarDao extends AbstractComplexDao<Exemplar_livro, Integer> imp
     @Override
     protected void addNestedEntity(Exemplar_livro exemplar, ResultSet rs) throws SQLException {
         // A entidade aninhada aqui é o Autor, que pertence ao Livro dentro do Exemplar.
-        int autorId = rs.getInt("idAutor");
+        int autorId = rs.getInt("id");
         if (autorId != 0) {
             Livro livroDoExemplar = exemplar.getLivro();
             boolean autorJaAdicionado = livroDoExemplar.getAutores().stream().anyMatch(a -> a.getId() == autorId);
@@ -94,12 +94,12 @@ public class ExemplarDao extends AbstractComplexDao<Exemplar_livro, Integer> imp
             e.id_livro, e.status,
             l.isbn, l.titulo, l.anoPublicacao,
             c.idCategoria, c.nomeCategoria,
-            a.idAutor, a.nome, a.paisOrigem
+            a.id, a.nome, a.paisOrigem
         FROM exemplar_livro e
-        JOIN livro l ON e.livro_isbn = l.isbn
+        JOIN livro l ON e.isbn_livro = l.isbn
         JOIN categoria c ON l.categoria_idCategoria = c.idCategoria
         LEFT JOIN livro_has_autor lha ON l.isbn = lha.livro_ISBN
-        LEFT JOIN autor a ON lha.autor_idAutor = a.idAutor
+        LEFT JOIN autor a ON lha.autor_idAutor = a.id
         """;
     }
 

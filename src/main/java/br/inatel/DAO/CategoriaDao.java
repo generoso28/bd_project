@@ -19,8 +19,6 @@ public class CategoriaDao implements Dao<Categoria, Integer> {
         String sql = "INSERT INTO categoria (nomeCategoria) VALUES (?)";
         try (PreparedStatement stmt = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
             stmt.setString(1, categoria.getNome());
-            stmt.executeUpdate();
-
             ResultSet rs = stmt.getGeneratedKeys();
             return stmt.executeUpdate() > 0;
         }
@@ -35,7 +33,7 @@ public class CategoriaDao implements Dao<Categoria, Integer> {
             if (rs.next()) {
                 return new Categoria(
                         rs.getInt("idCategoria"),
-                        rs.getString("nome")
+                        rs.getString("nomeCategoria")
                 );
             }
         }
@@ -51,7 +49,7 @@ public class CategoriaDao implements Dao<Categoria, Integer> {
             while (rs.next()) {
                 categorias.add(new Categoria(
                         rs.getInt("idCategoria"),
-                        rs.getString("nome")
+                        rs.getString("nomeCategoria")
                 ));
             }
         }

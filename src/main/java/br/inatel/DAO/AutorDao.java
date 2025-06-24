@@ -24,14 +24,14 @@ public class AutorDao implements Dao<Autor, Integer> {
     }
     @Override
     public Autor read(Integer id) throws SQLException {
-        String sql = "SELECT * FROM autor WHERE idAutor = ?";
+        String sql = "SELECT * FROM autor WHERE id = ?";
         try (PreparedStatement stmt = conn.prepareStatement(sql)) {
             stmt.setInt(1, id);
             ResultSet rs = stmt.executeQuery();
             if (rs.next()) {
                 // Os nomes das colunas aqui já estavam corretos
                 return new Autor(
-                        rs.getInt("idAutor"),
+                        rs.getInt("id"),
                         rs.getString("nome"),
                         rs.getString("paisOrigem")
                 );
@@ -49,7 +49,7 @@ public class AutorDao implements Dao<Autor, Integer> {
             while (rs.next()) {
                 // Os nomes das colunas aqui já estavam corretos
                 autores.add(new Autor(
-                        rs.getInt("idAutor"),
+                        rs.getInt("id"),
                         rs.getString("nome"),
                         rs.getString("paisOrigem")
                 ));
@@ -60,7 +60,7 @@ public class AutorDao implements Dao<Autor, Integer> {
 
     @Override
     public boolean delete(Integer id) throws SQLException {
-        String sql = "DELETE FROM autor WHERE idAutor = ?";
+        String sql = "DELETE FROM autor WHERE id = ?";
         try (PreparedStatement stmt = conn.prepareStatement(sql)) {
             stmt.setInt(1, id);
             return stmt.executeUpdate() > 0;
